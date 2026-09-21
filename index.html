@@ -11,6 +11,26 @@
     <main id="game" aria-label="Apex Sunset 3D racing game">
       <canvas id="scene"></canvas>
 
+      <section id="intro-screen" class="intro-screen visible" aria-label="Apex Sunset opening cinematic">
+        <div class="intro-sun"></div>
+        <div class="intro-road">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="intro-car" aria-hidden="true">
+          <div class="intro-spoiler"></div>
+          <div class="intro-cabin"><span class="intro-eye left"></span><span class="intro-eye right"></span></div>
+          <div class="intro-hood"><strong>77</strong></div>
+          <span class="intro-wheel wheel-a"></span><span class="intro-wheel wheel-b"></span>
+        </div>
+        <div class="intro-copy">
+          <p>The circuit is calling</p>
+          <h1>Apex<br><span>Sunset</span></h1>
+          <small>Start your engines</small>
+        </div>
+        <div class="intro-progress"><i></i></div>
+        <button id="skip-intro" type="button">Skip intro</button>
+      </section>
+
       <section id="start-screen" class="panel screen visible">
         <div class="wallet" aria-label="Credits"><span>CR</span><strong id="wallet-balance">2,000</strong></div>
         <div class="logo" aria-label="Apex Sunset">

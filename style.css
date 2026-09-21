@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,800;0,900;1,800&family=Inter:wght@500;600;700&display=swap');
 
 :root {
-  --sun: #ffbe66;
-  --orange: #ee5b2b;
-  --blue: #1649d8;
-  --ink: #18203a;
-  --paper: #fff8e9;
+  --sun: #ffc447;
+  --orange: #d92832;
+  --blue: #132047;
+  --ink: #132047;
+  --paper: #fff4dc;
   --white: #ffffff;
 }
 
@@ -16,6 +16,46 @@ button { font: inherit; }
 #game, #scene { position: fixed; inset: 0; width: 100%; height: 100%; }
 #scene { display: block; touch-action: none; }
 
+.intro-screen { position: absolute; inset: 0; z-index: 100; display: none; overflow: hidden; color: var(--paper); background: linear-gradient(#62bfe3 0 55%, #dc3c34 55% 100%); }
+.intro-screen.visible { display: block; }
+.intro-screen.closing { animation: intro-exit .55s ease-in forwards; }
+.intro-sun { position: absolute; top: 8%; right: 9%; width: min(25vw, 230px); aspect-ratio: 1; border-radius: 50%; background: var(--sun); box-shadow: 0 0 70px rgba(255,196,71,.42); animation: intro-sun 5.7s ease-out both; }
+.intro-road { position: absolute; left: -20%; right: -20%; bottom: -24%; height: 65%; overflow: hidden; background: #343946; transform: perspective(500px) rotateX(60deg); transform-origin: bottom; }
+.intro-road::before, .intro-road::after { content: ''; position: absolute; top: 0; bottom: 0; width: 13px; background: var(--paper); }
+.intro-road::before { left: 22%; } .intro-road::after { right: 22%; }
+.intro-road i { position: absolute; left: 50%; width: 16px; height: 105px; background: var(--sun); animation: road-lines .7s linear infinite; }
+.intro-road i:nth-child(2) { top: 23%; } .intro-road i:nth-child(3) { top: 46%; } .intro-road i:nth-child(4) { top: 69%; } .intro-road i:nth-child(5) { top: 92%; }
+.intro-car { position: absolute; left: 50%; bottom: 13%; width: 260px; height: 125px; transform: translateX(-190vw) rotate(-2deg); filter: drop-shadow(0 24px 13px rgba(19,32,71,.38)); animation: car-arrive 5.7s cubic-bezier(.17,.67,.18,1) both; }
+.intro-hood { position: absolute; inset: 36px 0 9px; z-index: 2; border-radius: 52% 52% 25% 25% / 60% 60% 30% 30%; background: linear-gradient(160deg, #ff4b42, #b20f24 68%); border-bottom: 8px solid #8e0b1c; }
+.intro-hood::before, .intro-hood::after { content: ''; position: absolute; top: 54%; width: 42px; height: 15px; border-radius: 50%; background: #fff2a8; box-shadow: 0 0 16px #ffc447; }
+.intro-hood::before { left: 24px; transform: rotate(8deg); } .intro-hood::after { right: 24px; transform: rotate(-8deg); }
+.intro-hood strong { position: absolute; left: 50%; top: 48%; transform: translate(-50%,-50%) skew(-8deg); color: var(--sun); font: italic 900 2.4rem/1 "Barlow Condensed", sans-serif; text-shadow: 2px 3px 0 var(--blue); }
+.intro-cabin { position: absolute; z-index: 3; left: 54px; top: 7px; width: 152px; height: 67px; overflow: hidden; border: 7px solid #b20f24; border-radius: 48% 48% 20% 20%; background: #bfe9ef; }
+.intro-eye { position: absolute; top: 14px; width: 36px; height: 30px; border-radius: 50%; background: #fff; box-shadow: inset 0 -4px 0 rgba(19,32,71,.12); }
+.intro-eye::after { content: ''; position: absolute; top: 7px; width: 13px; height: 15px; border-radius: 50%; background: #2577b7; border: 4px solid var(--blue); animation: eye-look 5.7s ease both; }
+.intro-eye.left { left: 30px; } .intro-eye.right { right: 30px; }
+.intro-eye.left::after { right: 3px; } .intro-eye.right::after { left: 3px; }
+.intro-spoiler { position: absolute; z-index: 1; left: 22px; top: 34px; width: 216px; height: 13px; border-radius: 5px; background: #7f0b1b; }
+.intro-wheel { position: absolute; z-index: 1; bottom: 0; width: 49px; height: 49px; border: 9px solid #171925; border-radius: 50%; background: #88909a; animation: wheels .22s linear infinite; }
+.wheel-a { left: 25px; } .wheel-b { right: 25px; }
+.intro-copy { position: absolute; left: 7vw; top: 13%; z-index: 5; transform: translateY(35px); opacity: 0; animation: intro-copy 5.7s ease both; }
+.intro-copy p, .intro-copy small { display: block; margin: 0; font: 700 clamp(.7rem,1.3vw,1rem)/1 Inter, sans-serif; }
+.intro-copy h1 { margin: .4rem 0 .7rem; font: italic 900 clamp(4.4rem,13vw,10rem)/.64 "Barlow Condensed", sans-serif; letter-spacing: -.05em; text-transform: uppercase; text-shadow: .055em .055em 0 var(--blue); }
+.intro-copy h1 span { color: var(--sun); margin-left: .32em; }
+.intro-copy small { color: var(--sun); }
+.intro-progress { position: absolute; z-index: 5; left: 7vw; right: 7vw; bottom: 6%; height: 4px; overflow: hidden; background: rgba(255,255,255,.22); }
+.intro-progress i { display: block; height: 100%; background: var(--sun); transform-origin: left; animation: intro-progress 5.7s linear forwards; }
+#skip-intro { position: absolute; z-index: 6; right: 7vw; bottom: 8%; padding: .55rem .8rem; border: 1px solid rgba(255,255,255,.55); border-radius: 100px; color: var(--paper); background: rgba(19,32,71,.24); cursor: pointer; font: 700 .72rem/1 Inter, sans-serif; }
+
+@keyframes car-arrive { 0% { transform: translateX(-190vw) rotate(-3deg) scale(.72); } 38% { transform: translateX(-50%) rotate(-3deg) scale(1.06); } 58%,88% { transform: translateX(-50%) rotate(0) scale(1); } 100% { transform: translateX(140vw) rotate(4deg) scale(.84); } }
+@keyframes wheels { to { transform: rotate(360deg); } }
+@keyframes road-lines { from { transform: translate(-50%,-115%); } to { transform: translate(-50%,135%); } }
+@keyframes eye-look { 0%,42% { transform: translateX(7px); } 55%,88% { transform: translateX(0); } 100% { transform: translateX(8px); } }
+@keyframes intro-copy { 0%,42% { opacity: 0; transform: translateY(35px); } 55%,88% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-15px); } }
+@keyframes intro-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes intro-sun { 0% { transform: scale(.8); opacity: 0; } 20%,90% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.1); opacity: 0; } }
+@keyframes intro-exit { to { opacity: 0; visibility: hidden; } }
+
 .screen {
   position: absolute;
   inset: 0;
@@ -25,7 +65,7 @@ button { font: inherit; }
   align-items: center;
   justify-content: center;
   text-align: center;
-  background: rgba(255, 90, 42, .8);
+  background: rgba(217, 40, 50, .82);
   backdrop-filter: blur(12px) saturate(1.1);
 }
 .screen.visible { display: flex; }
@@ -155,6 +195,13 @@ kbd { min-width: 25px; padding: .38rem .42rem; border: 1px solid rgba(255,255,25
   .car-card { min-width: 74vw; scroll-snap-align: center; }
   .garage-header { padding-right: .2rem; }
   .garage-header .wallet { display: flex; }
+  .intro-copy { top: 9%; left: 8vw; }
+  .intro-copy h1 { font-size: clamp(4.2rem, 24vw, 7rem); }
+  .intro-car { width: 220px; height: 108px; bottom: 17%; }
+  .intro-cabin { left: 46px; width: 129px; height: 59px; }
+  .intro-hood { inset: 31px 0 8px; }
+  .intro-spoiler { width: 184px; left: 18px; }
+  .intro-wheel { width: 43px; height: 43px; }
 }
 
 @media (max-height: 780px) and (min-width: 721px) {
@@ -163,4 +210,7 @@ kbd { min-width: 25px; padding: .38rem .42rem; border: 1px solid rgba(255,255,25
   .tagline { margin-top: 1.4rem; }
 }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; }
+  .intro-car, .intro-copy, .intro-sun, .intro-progress i { animation-duration: 1.2s !important; }
+}

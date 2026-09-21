@@ -21,7 +21,7 @@ const MAPS = {
   coast: { name: 'Coast sprint', rx: 64, rz: 28, width: 19, sky: 0x75b9c8, fog: 0x5f9ba9, ground: 0x477d72, road: 0x303a43 }
 };
 const CARS = {
-  blitz: { name: 'Blitz 86', class: 'Street starter', price: 0, color: 0x1649d8, accel: 23, max: 48, handling: 1.35 },
+  blitz: { name: 'Blaze 77', class: 'Redline starter', price: 0, color: 0xd92832, accel: 23, max: 48, handling: 1.35 },
   comet: { name: 'Comet GT', class: 'Balanced sport', price: 1800, color: 0xf2c451, accel: 25, max: 52, handling: 1.42 },
   solar: { name: 'Solar RS', class: 'High acceleration', price: 4200, color: 0xee5b2b, accel: 29, max: 55, handling: 1.4 },
   phantom: { name: 'Phantom X', class: 'Top speed', price: 7800, color: 0x7a65d8, accel: 30, max: 61, handling: 1.46 },
@@ -163,6 +163,23 @@ function buildTrack(mapId) {
 }
 buildTrack(profile.selectedMap);
 
+function makeEyeTexture() {
+  const eyeCanvas = document.createElement('canvas');
+  eyeCanvas.width = 256; eyeCanvas.height = 96;
+  const ctx = eyeCanvas.getContext('2d');
+  ctx.fillStyle = '#bfe9ef'; ctx.fillRect(0, 0, 256, 96);
+  for (const x of [78, 178]) {
+    ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.ellipse(x, 48, 38, 29, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#132047'; ctx.beginPath(); ctx.arc(x + (x < 128 ? 8 : -8), 49, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#62bfe3'; ctx.beginPath(); ctx.arc(x + (x < 128 ? 10 : -10), 46, 6, 0, Math.PI * 2); ctx.fill();
+  }
+  const texture = new THREE.CanvasTexture(eyeCanvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+const eyeTexture = makeEyeTexture();
+
 function createCar(color = 0x1649d8) {
   const group = new THREE.Group();
   const paint = new THREE.MeshStandardMaterial({ color, roughness: .32, metalness: .2 });
@@ -176,6 +193,8 @@ function createCar(color = 0x1649d8) {
   nose.position.set(0, .78, 2.1); nose.castShadow = true; group.add(nose);
   const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.62, .65, 1.85), glass);
   cabin.position.set(0, 1.2, -.2); cabin.rotation.x = -.04; cabin.castShadow = true; group.add(cabin);
+  const eyes = new THREE.Mesh(new THREE.PlaneGeometry(1.28, .48), new THREE.MeshBasicMaterial({ map: eyeTexture, transparent: false }));
+  eyes.position.set(0, 1.25, .74); eyes.rotation.x = -.04; group.add(eyes);
   const spoiler = new THREE.Mesh(new THREE.BoxGeometry(2.42, .12, .5), dark);
   spoiler.position.set(0, 1.12, -1.95); group.add(spoiler);
   const postGeo = new THREE.BoxGeometry(.1, .48, .1);
@@ -634,6 +653,17 @@ function pause() {
   document.querySelector('#mobile-controls').classList.remove('visible');
 }
 function resume() { if (game.state === 'paused') { game.state = 'racing'; document.querySelector('#pause-screen').classList.remove('visible'); document.querySelector('#mobile-controls').classList.add('visible'); clock.getDelta(); } }
+
+const introScreen = document.querySelector('#intro-screen');
+let introTimer;
+function dismissIntro() {
+  if (!introScreen.classList.contains('visible') || introScreen.classList.contains('closing')) return;
+  clearTimeout(introTimer);
+  introScreen.classList.add('closing');
+  setTimeout(() => introScreen.classList.remove('visible', 'closing'), 560);
+}
+introTimer = setTimeout(dismissIntro, matchMedia('(prefers-reduced-motion: reduce)').matches ? 1250 : 5750);
+document.querySelector('#skip-intro').addEventListener('click', dismissIntro);
 
 document.querySelector('#start-button').addEventListener('click', startRace);
 document.querySelector('#restart-button').addEventListener('click', startRace);
