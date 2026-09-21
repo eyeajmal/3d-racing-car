@@ -43,7 +43,7 @@ scene.fog.color.set(MAPS[profile.selectedMap].fog);
 const LAPS = 3;
 const COUNTDOWN_DURATION = 3.55;
 const controls = { gas: false, brake: false, left: false, right: false, drift: false };
-const game = { state: 'menu', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, lastAngle: 0, boost: 1, finished: false, collisionCooldown: 0, cameraShake: 0 };
+const game = { state: 'menu', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, lastAngle: 0, boost: 1, finished: false, collisionCooldown: 0, wallCooldown: 0, cameraShake: 0 };
 const carState = { speed: 0, heading: 0, velocity: new THREE.Vector2(), x: RX, z: -6 };
 let audio;
 let messageTimer;
@@ -112,6 +112,27 @@ function addTrackLine(offset, color, width, dash = false) {
   }
 }
 
+function addGuardWalls() {
+  const segments = 128;
+  const red = new THREE.MeshStandardMaterial({ color: 0xe94b35, roughness: .72 });
+  const cream = new THREE.MeshStandardMaterial({ color: 0xfff5df, roughness: .72 });
+  for (const side of [-1, 1]) {
+    const offset = side * (TRACK_WIDTH / 2 + .38);
+    for (let i = 0; i < segments; i++) {
+      const a = i / segments * Math.PI * 2;
+      const next = (i + 1) / segments * Math.PI * 2;
+      const x1 = Math.cos(a) * (RX + offset), z1 = Math.sin(a) * (RZ + offset * .68);
+      const x2 = Math.cos(next) * (RX + offset), z2 = Math.sin(next) * (RZ + offset * .68);
+      const length = Math.hypot(x2 - x1, z2 - z1);
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(.72, 1.05, length + .18), Math.floor(i / 4) % 2 ? red : cream);
+      wall.position.set((x1 + x2) / 2, .62, (z1 + z2) / 2);
+      wall.rotation.y = Math.atan2(x2 - x1, z2 - z1);
+      wall.receiveShadow = true;
+      trackGroup.add(wall);
+    }
+  }
+}
+
 function buildTrack(mapId) {
   const map = MAPS[mapId];
   RX = map.rx; RZ = map.rz; TRACK_WIDTH = map.width;
@@ -130,6 +151,7 @@ function buildTrack(mapId) {
   addTrackLine(-TRACK_WIDTH / 2 + .5, 0xfff5df, .28);
   addTrackLine(TRACK_WIDTH / 2 - .5, 0xfff5df, .28);
   addTrackLine(0, 0xf4c764, .13, true);
+  addGuardWalls();
 
   for (let z = -6; z < 6; z += 1.5) {
     for (let x = 0; x < Math.floor(TRACK_WIDTH / .85); x++) {
@@ -261,10 +283,51 @@ addBillboard('SUNSET', -66, 0, Math.PI / 2);
 const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(15, 48), new THREE.MeshBasicMaterial({ color: 0xffd27a, fog: false }));
 sunDisc.position.set(-100, 44, -150); sunDisc.lookAt(camera.position); scene.add(sunDisc);
 
+function trackRadialBounds(x, z, clearance = 0) {
+  const angle = Math.atan2(z / RZ, x / RX);
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const halfWidth = Math.max(1, TRACK_WIDTH / 2 - clearance);
+  const radialAt = offset => Math.sqrt(
+    Math.pow(cos * (RX + offset) / RX, 2) +
+    Math.pow(sin * (RZ + offset * .68) / RZ, 2)
+  );
+  return { inner: radialAt(-halfWidth), outer: radialAt(halfWidth) };
+}
+
 function onTrack(x, z) {
   const radial = Math.sqrt((x * x) / (RX * RX) + (z * z) / (RZ * RZ));
-  const roadRadius = Math.max(TRACK_WIDTH / (2 * RX), TRACK_WIDTH * .68 / (2 * RZ));
-  return Math.abs(radial - 1) < roadRadius + .012;
+  const bounds = trackRadialBounds(x, z, .2);
+  return radial > bounds.inner && radial < bounds.outer;
+}
+
+function checkTrackWalls(dt) {
+  game.wallCooldown = Math.max(0, game.wallCooldown - dt);
+  const radial = Math.sqrt((carState.x * carState.x) / (RX * RX) + (carState.z * carState.z) / (RZ * RZ));
+  const bounds = trackRadialBounds(carState.x, carState.z, 1.35);
+  const hitOuter = radial > bounds.outer;
+  const hitInner = radial < bounds.inner;
+  if (!hitOuter && !hitInner) return;
+
+  const boundary = hitOuter ? bounds.outer : bounds.inner;
+  const scale = boundary / Math.max(radial, .001);
+  carState.x *= scale;
+  carState.z *= scale;
+
+  const normal = new THREE.Vector2(carState.x / (RX * RX), carState.z / (RZ * RZ)).normalize();
+  const normalSpeed = carState.velocity.dot(normal);
+  if ((hitOuter && normalSpeed > 0) || (hitInner && normalSpeed < 0)) {
+    carState.velocity.addScaledVector(normal, -normalSpeed * 1.75);
+  }
+  carState.velocity.multiplyScalar(.58);
+
+  if (game.wallCooldown <= 0) {
+    const roadDirection = hitOuter ? normal.clone().multiplyScalar(-1) : normal;
+    spawnImpact(carState.x, carState.z, roadDirection);
+    playImpactSound(6 + Math.min(5, Math.abs(normalSpeed) * .25));
+    game.cameraShake = Math.max(game.cameraShake, .62);
+    game.wallCooldown = .42;
+    flash('WALL HIT');
+  }
 }
 
 function resetCar() {
@@ -304,6 +367,7 @@ function updatePlayer(dt) {
   if (carState.velocity.length() > max) carState.velocity.setLength(max);
   carState.x += carState.velocity.x * dt;
   carState.z += carState.velocity.y * dt;
+  checkTrackWalls(dt);
   carState.speed = carState.velocity.dot(forward);
   playerCar.position.set(carState.x, .1, carState.z);
   playerCar.rotation.y = carState.heading;
@@ -535,7 +599,7 @@ function updateAudio() {
 
 function startRace() {
   initAudio();
-  Object.assign(game, { state: 'countdown', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, finished: false, collisionCooldown: 0, cameraShake: 0 });
+  Object.assign(game, { state: 'countdown', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, finished: false, collisionCooldown: 0, wallCooldown: 0, cameraShake: 0 });
   placeCar();
   opponents.forEach((o, i) => { o.phase = -.09 - i * .08; o.progress = 0; o.hit = 0; });
   document.querySelectorAll('.screen').forEach(el => el.classList.remove('visible'));
