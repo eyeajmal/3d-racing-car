@@ -1,6 +1,6 @@
 # Apex Sunset
 
-A self-contained 3D racing game for the browser. Race three laps against AI cars, earn credits based on finishing position, buy faster cars, and compete across three circuits.
+A self-contained open-world 3D driving game for the browser. Explore Sunset City, collect credits, dodge traffic, buy faster cars, or enter three-lap circuit events.
 
 ## Progression
 
@@ -9,6 +9,7 @@ A self-contained 3D racing game for the browser. Race three laps against AI cars
 - Race prizes: CR 1,200 / 700 / 400 / 200 by finishing position
 - Bonus credits for the longer Desert Giant and Coast Sprint circuits
 - Three maps: Sunset Oval, the larger Desert Giant, and Coast Sprint
+- Open-world Sunset City with a street grid, buildings, traffic, solid collisions, and exploration pickups
 - Populated grandstands, car impacts, particles, camera shake, and engine audio
 
 ## Run it

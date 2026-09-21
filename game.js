@@ -16,6 +16,7 @@ const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 50
 const clock = new THREE.Clock();
 
 const MAPS = {
+  city: { name: 'Sunset City', world: true, rx: 115, rz: 115, width: 20, sky: 0x62bfe3, fog: 0x7aa9b5, ground: 0x44705b, road: 0x343946 },
   sunset: { name: 'Sunset oval', rx: 55, rz: 36, width: 20, sky: 0xff9a58, fog: 0xd9794b, ground: 0xd46d35, road: 0x34394a },
   desert: { name: 'Desert giant', rx: 78, rz: 50, width: 24, sky: 0xf0ae62, fog: 0xc98348, ground: 0xb96735, road: 0x3e3b3b },
   coast: { name: 'Coast sprint', rx: 64, rz: 28, width: 19, sky: 0x75b9c8, fog: 0x5f9ba9, ground: 0x477d72, road: 0x303a43 }
@@ -29,12 +30,17 @@ const CARS = {
 };
 let profile;
 try { profile = JSON.parse(localStorage.getItem('apex-sunset-profile')); } catch { profile = null; }
-if (!profile || !Array.isArray(profile.unlocked)) profile = { credits: 2000, unlocked: ['blitz'], selectedCar: 'blitz', selectedMap: 'sunset' };
+if (!profile || !Array.isArray(profile.unlocked)) profile = { credits: 2000, unlocked: ['blitz'], selectedCar: 'blitz', selectedMap: 'city' };
 if (!Number.isFinite(profile.credits)) profile.credits = 2000;
 profile.unlocked = profile.unlocked.filter(id => CARS[id]);
 if (!profile.unlocked.includes('blitz')) profile.unlocked.unshift('blitz');
 if (!CARS[profile.selectedCar]) profile.selectedCar = 'blitz';
-if (!MAPS[profile.selectedMap]) profile.selectedMap = 'sunset';
+if (!MAPS[profile.selectedMap]) profile.selectedMap = 'city';
+if (!profile.openWorldReady) {
+  profile.selectedMap = 'city';
+  profile.openWorldReady = true;
+  localStorage.setItem('apex-sunset-profile', JSON.stringify(profile));
+}
 let RX = MAPS[profile.selectedMap].rx;
 let RZ = MAPS[profile.selectedMap].rz;
 let TRACK_WIDTH = MAPS[profile.selectedMap].width;
@@ -43,7 +49,7 @@ scene.fog.color.set(MAPS[profile.selectedMap].fog);
 const LAPS = 3;
 const COUNTDOWN_DURATION = 3.55;
 const controls = { gas: false, brake: false, left: false, right: false, drift: false };
-const game = { state: 'menu', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, lastAngle: 0, boost: 1, finished: false, collisionCooldown: 0, wallCooldown: 0, cameraShake: 0 };
+const game = { state: 'menu', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, lastAngle: 0, boost: 1, finished: false, collisionCooldown: 0, wallCooldown: 0, cameraShake: 0, pickups: 0 };
 const carState = { speed: 0, heading: 0, velocity: new THREE.Vector2(), x: RX, z: -6 };
 let audio;
 let messageTimer;
@@ -93,6 +99,8 @@ function ellipseRing(inner, outer, segments = 160) {
 }
 
 let trackGroup = new THREE.Group();
+let worldPickups = [];
+let worldObstacles = [];
 scene.add(trackGroup);
 
 function addTrackLine(offset, color, width, dash = false) {
@@ -133,6 +141,65 @@ function addGuardWalls() {
   }
 }
 
+function buildOpenWorld(map) {
+  worldPickups = [];
+  worldObstacles = [];
+  const roadMaterial = new THREE.MeshStandardMaterial({ color: map.road, roughness: .94 });
+  const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffc447 });
+  const sidewalkMaterial = new THREE.MeshStandardMaterial({ color: 0xbfc3bb, roughness: 1 });
+  const buildingColors = [0xe46a45, 0xf0b84f, 0x4d739b, 0xded2b2, 0x8f6a9c];
+  const grid = [-80, -40, 0, 40, 80];
+
+  for (const lane of grid) {
+    const vertical = new THREE.Mesh(new THREE.BoxGeometry(TRACK_WIDTH, .12, 240), roadMaterial);
+    vertical.position.set(lane, .08, 0); vertical.receiveShadow = true; trackGroup.add(vertical);
+    const horizontal = new THREE.Mesh(new THREE.BoxGeometry(240, .12, TRACK_WIDTH), roadMaterial);
+    horizontal.position.set(0, .081, lane); horizontal.receiveShadow = true; trackGroup.add(horizontal);
+    for (let marker = -108; marker <= 108; marker += 12) {
+      if (grid.some(cross => Math.abs(marker - cross) < TRACK_WIDTH * .65)) continue;
+      const vDash = new THREE.Mesh(new THREE.BoxGeometry(.18, .04, 5), lineMaterial);
+      vDash.position.set(lane, .16, marker); trackGroup.add(vDash);
+      const hDash = new THREE.Mesh(new THREE.BoxGeometry(5, .04, .18), lineMaterial);
+      hDash.position.set(marker, .161, lane); trackGroup.add(hDash);
+    }
+  }
+
+  const blockCenters = [-60, -20, 20, 60];
+  blockCenters.forEach((bx, xi) => blockCenters.forEach((bz, zi) => {
+    const plaza = new THREE.Mesh(new THREE.BoxGeometry(18, .35, 18), sidewalkMaterial);
+    plaza.position.set(bx, .17, bz); plaza.receiveShadow = true; trackGroup.add(plaza);
+    const height = 7 + ((xi * 11 + zi * 7) % 13);
+    const width = 9 + ((xi + zi) % 3) * 2;
+    const building = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, width),
+      new THREE.MeshStandardMaterial({ color: buildingColors[(xi * 2 + zi) % buildingColors.length], roughness: .78, metalness: .04 })
+    );
+    building.position.set(bx + (xi % 2 ? 2 : -2), height / 2 + .35, bz + (zi % 2 ? -2 : 2));
+    building.castShadow = building.receiveShadow = true; trackGroup.add(building);
+    worldObstacles.push({ x: building.position.x, z: building.position.z, half: width / 2 + 1.4 });
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(width + .7, .5, width + .7), new THREE.MeshStandardMaterial({ color: 0x293555, roughness: .8 }));
+    roof.position.set(building.position.x, height + .6, building.position.z); trackGroup.add(roof);
+  }));
+
+  const boundaryMaterial = new THREE.MeshStandardMaterial({ color: 0xd92832, roughness: .75 });
+  for (const [x, z, w, d] of [[0, -121, 244, 1.2], [0, 121, 244, 1.2], [-121, 0, 1.2, 244], [121, 0, 1.2, 244]]) {
+    const boundary = new THREE.Mesh(new THREE.BoxGeometry(w, 2, d), boundaryMaterial);
+    boundary.position.set(x, 1, z); boundary.receiveShadow = true; trackGroup.add(boundary);
+  }
+
+  const pickupPositions = [[0,30], [40,15], [80,-25], [55,-80], [0,-55], [-40,-20], [-80,35], [-55,80], [20,80], [80,70], [-80,-75], [20,-40]];
+  pickupPositions.forEach(([x, z], index) => {
+    const pickup = new THREE.Mesh(
+      new THREE.TorusGeometry(.75, .2, 8, 20),
+      new THREE.MeshBasicMaterial({ color: 0xffc447 })
+    );
+    pickup.position.set(x, 1.7, z);
+    pickup.userData.pickupIndex = index;
+    trackGroup.add(pickup);
+    worldPickups.push(pickup);
+  });
+}
+
 function buildTrack(mapId) {
   const map = MAPS[mapId];
   RX = map.rx; RZ = map.rz; TRACK_WIDTH = map.width;
@@ -144,6 +211,12 @@ function buildTrack(mapId) {
   scene.fog.color.set(map.fog);
   scene.fog.density = mapId === 'desert' ? .006 : .008;
   ground.material.color.set(map.ground);
+
+  if (map.world) {
+    scene.fog.density = .0045;
+    buildOpenWorld(map);
+    return;
+  }
 
   const road = new THREE.Mesh(ellipseRing(-TRACK_WIDTH / 2, TRACK_WIDTH / 2), new THREE.MeshStandardMaterial({ color: map.road, roughness: .93 }));
   road.receiveShadow = true;
@@ -279,13 +352,15 @@ stand.position.set(-14, 0, -58); scene.add(stand);
 
 const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7d3e2e, roughness: 1 });
 const leafMat = new THREE.MeshStandardMaterial({ color: 0x315d48, roughness: 1 });
+const circuitTrees = new THREE.Group();
+scene.add(circuitTrees);
 for (let i = 0; i < 70; i++) {
   const a = (i / 70) * Math.PI * 2 + Math.sin(i * 8) * .08;
   const radius = 73 + (i % 5) * 4;
   const tree = new THREE.Group();
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.28, .42, 2.8, 7), trunkMat); trunk.position.y = 1.4;
   const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.8 + (i % 3) * .2, 5, 7), leafMat); leaves.position.y = 4.3;
-  tree.add(trunk, leaves); tree.position.set(Math.cos(a) * radius * 1.12, 0, Math.sin(a) * radius * .78); tree.rotation.y = i; scene.add(tree);
+  tree.add(trunk, leaves); tree.position.set(Math.cos(a) * radius * 1.12, 0, Math.sin(a) * radius * .78); tree.rotation.y = i; circuitTrees.add(tree);
 }
 
 function addBillboard(text, x, z, rotation = 0) {
@@ -314,6 +389,14 @@ function trackRadialBounds(x, z, clearance = 0) {
 }
 
 function onTrack(x, z) {
+  if (MAPS[profile.selectedMap].world) {
+    const withinWorld = Math.abs(x) < 118 && Math.abs(z) < 118;
+    const nearestXRoad = Math.round(x / 40) * 40;
+    const nearestZRoad = Math.round(z / 40) * 40;
+    const onVertical = Math.abs(nearestXRoad) <= 80 && Math.abs(x - nearestXRoad) < TRACK_WIDTH / 2;
+    const onHorizontal = Math.abs(nearestZRoad) <= 80 && Math.abs(z - nearestZRoad) < TRACK_WIDTH / 2;
+    return withinWorld && (onVertical || onHorizontal);
+  }
   const radial = Math.sqrt((x * x) / (RX * RX) + (z * z) / (RZ * RZ));
   const bounds = trackRadialBounds(x, z, .2);
   return radial > bounds.inner && radial < bounds.outer;
@@ -321,6 +404,40 @@ function onTrack(x, z) {
 
 function checkTrackWalls(dt) {
   game.wallCooldown = Math.max(0, game.wallCooldown - dt);
+  if (MAPS[profile.selectedMap].world) {
+    const limit = 117.5;
+    let hit = false;
+    const normal = new THREE.Vector2();
+    let hitLabel = 'CITY LIMIT';
+    for (const obstacle of worldObstacles) {
+      const dx = carState.x - obstacle.x, dz = carState.z - obstacle.z;
+      if (Math.abs(dx) >= obstacle.half || Math.abs(dz) >= obstacle.half) continue;
+      const overlapX = obstacle.half - Math.abs(dx), overlapZ = obstacle.half - Math.abs(dz);
+      if (overlapX < overlapZ) {
+        normal.set(Math.sign(dx) || 1, 0);
+        carState.x = obstacle.x + normal.x * obstacle.half;
+      } else {
+        normal.set(0, Math.sign(dz) || 1);
+        carState.z = obstacle.z + normal.y * obstacle.half;
+      }
+      hit = true; hitLabel = 'BUILDING HIT'; break;
+    }
+    if (!hit) {
+      if (carState.x > limit) { carState.x = limit; normal.set(-1, 0); hit = true; }
+      else if (carState.x < -limit) { carState.x = -limit; normal.set(1, 0); hit = true; }
+      if (carState.z > limit) { carState.z = limit; normal.set(0, -1); hit = true; }
+      else if (carState.z < -limit) { carState.z = -limit; normal.set(0, 1); hit = true; }
+    }
+    if (!hit) return;
+    const towardSurface = carState.velocity.dot(normal);
+    if (towardSurface < 0) carState.velocity.addScaledVector(normal, -towardSurface * 1.7);
+    carState.velocity.multiplyScalar(.58);
+    if (game.wallCooldown <= 0) {
+      spawnImpact(carState.x, carState.z, normal);
+      playImpactSound(7); game.cameraShake = .65; game.wallCooldown = .42; flash(hitLabel);
+    }
+    return;
+  }
   const radial = Math.sqrt((carState.x * carState.x) / (RX * RX) + (carState.z * carState.z) / (RZ * RZ));
   const bounds = trackRadialBounds(carState.x, carState.z, 1.35);
   const hitOuter = radial > bounds.outer;
@@ -350,6 +467,16 @@ function checkTrackWalls(dt) {
 }
 
 function resetCar() {
+  if (MAPS[profile.selectedMap].world) {
+    const nearX = THREE.MathUtils.clamp(Math.round(carState.x / 40) * 40, -80, 80);
+    const nearZ = THREE.MathUtils.clamp(Math.round(carState.z / 40) * 40, -80, 80);
+    if (Math.abs(carState.x - nearX) < Math.abs(carState.z - nearZ)) carState.x = nearX;
+    else carState.z = nearZ;
+    carState.speed = 0; carState.velocity.set(0, 0);
+    playerCar.position.set(carState.x, .1, carState.z);
+    flash('Back on the road');
+    return;
+  }
   const a = Math.atan2(carState.z / RZ, carState.x / RX);
   carState.x = Math.cos(a) * RX; carState.z = Math.sin(a) * RZ;
   carState.heading = Math.atan2(-Math.sin(a) * RX, Math.cos(a) * RZ);
@@ -359,12 +486,33 @@ function resetCar() {
 }
 
 function placeCar() {
-  carState.x = RX; carState.z = -4;
+  const isWorld = MAPS[profile.selectedMap].world;
+  carState.x = isWorld ? 0 : RX; carState.z = isWorld ? -12 : -4;
   carState.heading = 0; carState.speed = 0; carState.velocity.set(0, 0);
   playerCar.position.set(carState.x, .1, carState.z); playerCar.rotation.y = 0;
   game.lastAngle = Math.atan2(carState.z / RZ, carState.x / RX);
 }
 placeCar();
+
+function updateWorldPickups(dt) {
+  worldPickups.forEach(pickup => {
+    if (!pickup.visible) return;
+    pickup.rotation.y += dt * 2.8;
+    pickup.rotation.x = Math.sin(game.time * 2 + pickup.userData.pickupIndex) * .18;
+    if (Math.hypot(carState.x - pickup.position.x, carState.z - pickup.position.z) < 2.5) {
+      pickup.visible = false;
+      game.pickups += 1;
+      profile.credits += 100;
+      saveProfile();
+      flash(`CR 100 · ${game.pickups}/${worldPickups.length} found`);
+      if (game.pickups === worldPickups.length) {
+        profile.credits += 1000;
+        saveProfile();
+        setTimeout(() => flash('CITY CLEARED · BONUS CR 1,000'), 900);
+      }
+    }
+  });
+}
 
 function updatePlayer(dt) {
   const carSpec = CARS[profile.selectedCar];
@@ -392,6 +540,11 @@ function updatePlayer(dt) {
   playerCar.rotation.y = carState.heading;
   playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, -steer * Math.min(Math.abs(forwardSpeed) / 40, 1) * .07, .12);
 
+  if (MAPS[profile.selectedMap].world) {
+    updateWorldPickups(dt);
+    return;
+  }
+
   const angle = Math.atan2(carState.z / RZ, carState.x / RX);
   let delta = angle - game.lastAngle;
   if (delta < -Math.PI) delta += Math.PI * 2;
@@ -409,6 +562,21 @@ function updatePlayer(dt) {
 
 function updateOpponents(dt = 0) {
   opponents.forEach((o, i) => {
+    if (MAPS[profile.selectedMap].world) {
+      const size = i === 0 ? 40 : 80;
+      const perimeter = size * 8;
+      let p = (Math.max(0, game.time - COUNTDOWN_DURATION) * (10 + i * 1.4) + i * 71) % perimeter;
+      let x, z, heading;
+      if (p < size * 2) { x = -size + p; z = -size; heading = Math.PI / 2; }
+      else if (p < size * 4) { p -= size * 2; x = size; z = -size + p; heading = 0; }
+      else if (p < size * 6) { p -= size * 4; x = size - p; z = size; heading = -Math.PI / 2; }
+      else { p -= size * 6; x = -size; z = size - p; heading = Math.PI; }
+      o.car.position.set(x, .1, z); o.car.rotation.y = heading;
+      o.hit = Math.max(0, o.hit - dt);
+      o.car.rotation.z = o.hit > 0 ? Math.sin(o.hit * 35) * o.hit * .38 : 0;
+      o.progress = 0;
+      return;
+    }
     const t = Math.max(0, game.time - COUNTDOWN_DURATION) * o.rate + o.phase;
     const wobble = Math.sin(t * 3 + i) * .45;
     const lane = o.lane + wobble;
@@ -553,7 +721,15 @@ function selectMap(id) {
   stand.position.set(-RX * .25, 0, -(RZ + 22));
   placeCar();
   updateOpponents();
+  updateModeUI();
   document.querySelectorAll('[data-map]').forEach(button => button.classList.toggle('selected', button.dataset.map === id));
+}
+
+function updateModeUI() {
+  const isWorld = MAPS[profile.selectedMap].world;
+  document.querySelector('#start-button').textContent = isWorld ? 'Enter open world' : 'Start race';
+  stand.visible = !isWorld;
+  circuitTrees.visible = !isWorld;
 }
 
 function showRaceMenu() {
@@ -574,11 +750,24 @@ function getPlace() {
 function ordinal(n) { return `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`; }
 
 function updateHUD() {
+  const isWorld = MAPS[profile.selectedMap].world;
   document.querySelector('#speed').textContent = Math.round(carState.velocity.length() * 4.5);
-  document.querySelector('#lap').textContent = `${Math.min(game.lap + 1, LAPS)} / ${LAPS}`;
-  document.querySelector('#position').textContent = getPlace();
+  if (isWorld) {
+    const directions = ['N', 'E', 'S', 'W'];
+    const directionIndex = ((Math.round(carState.heading / (Math.PI / 2)) % 4) + 4) % 4;
+    document.querySelector('#position').textContent = directions[directionIndex];
+    document.querySelector('#position-total').textContent = 'Heading';
+    document.querySelector('#lap-label').textContent = 'Mode';
+    document.querySelector('#lap').textContent = 'Free roam';
+    document.querySelector('#best-time').textContent = `Pickups ${game.pickups} / ${worldPickups.length}`;
+  } else {
+    document.querySelector('#lap').textContent = `${Math.min(game.lap + 1, LAPS)} / ${LAPS}`;
+    document.querySelector('#lap-label').textContent = 'Lap';
+    document.querySelector('#position').textContent = getPlace();
+    document.querySelector('#position-total').textContent = '/ 4';
+    document.querySelector('#best-time').textContent = game.best < Infinity ? `Best ${formatTime(game.best)}` : 'Best —';
+  }
   document.querySelector('#race-time').textContent = formatTime(Math.max(0, game.time - COUNTDOWN_DURATION));
-  document.querySelector('#best-time').textContent = game.best < Infinity ? `Best ${formatTime(game.best)}` : 'Best —';
   document.querySelector('#boost-bar').style.transform = `scaleX(${game.boost})`;
   drawMinimap();
 }
@@ -587,6 +776,19 @@ function drawMinimap() {
   const c = document.querySelector('#minimap'), ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
   ctx.save(); ctx.translate(c.width / 2, c.height / 2); ctx.scale(1.28, 1.28);
+  if (MAPS[profile.selectedMap].world) {
+    ctx.strokeStyle = 'rgba(255,244,220,.38)'; ctx.lineWidth = 6;
+    for (const lane of [-80, -40, 0, 40, 80]) {
+      ctx.beginPath(); ctx.moveTo(lane / 2, -58); ctx.lineTo(lane / 2, 58); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-58, lane / 2); ctx.lineTo(58, lane / 2); ctx.stroke();
+    }
+    const cityDot = (x, z, color, r) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x / 2, z / 2, r, 0, Math.PI * 2); ctx.fill(); };
+    worldPickups.filter(p => p.visible).forEach(p => cityDot(p.position.x, p.position.z, '#ffc447', 1.5));
+    opponents.forEach(o => cityDot(o.car.position.x, o.car.position.z, '#fff4dc', 2.4));
+    cityDot(carState.x, carState.z, '#d92832', 4.2);
+    ctx.restore();
+    return;
+  }
   ctx.strokeStyle = 'rgba(255,248,233,.35)'; ctx.lineWidth = 12; ctx.beginPath(); ctx.ellipse(0, 0, 58, 36, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.strokeStyle = '#fff8e9'; ctx.lineWidth = 2; ctx.stroke();
   const dot = (x, z, color, r) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x / RX * 58, z / RZ * 36, r, 0, Math.PI * 2); ctx.fill(); };
@@ -618,7 +820,8 @@ function updateAudio() {
 
 function startRace() {
   initAudio();
-  Object.assign(game, { state: 'countdown', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, finished: false, collisionCooldown: 0, wallCooldown: 0, cameraShake: 0 });
+  Object.assign(game, { state: 'countdown', time: 0, countdown: 0, lap: 0, lapStart: 0, best: Infinity, totalAngle: 0, finished: false, collisionCooldown: 0, wallCooldown: 0, cameraShake: 0, pickups: 0 });
+  if (MAPS[profile.selectedMap].world) worldPickups.forEach(pickup => { pickup.visible = true; });
   placeCar();
   opponents.forEach((o, i) => { o.phase = -.09 - i * .08; o.progress = 0; o.hit = 0; });
   document.querySelectorAll('.screen').forEach(el => el.classList.remove('visible'));
@@ -718,4 +921,5 @@ updateWallets();
 renderGarage();
 document.querySelectorAll('[data-map]').forEach(button => button.classList.toggle('selected', button.dataset.map === profile.selectedMap));
 stand.position.set(-RX * .25, 0, -(RZ + 22));
+updateModeUI();
 updateOpponents(); updateCamera(.016); animate();

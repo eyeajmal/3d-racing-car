@@ -37,13 +37,14 @@
           <span>APEX</span>
           <span>SUNSET</span>
         </div>
-        <p class="tagline">Three laps. Four cars. Build your garage.</p>
+        <p class="tagline">Explore the city or enter a circuit race.</p>
         <div class="track-picker" aria-label="Choose circuit">
-          <button class="track-ticket selected" data-map="sunset"><strong>Sunset oval</strong><span>Classic · 3 laps</span></button>
+          <button class="track-ticket selected" data-map="city"><strong>Sunset City</strong><span>Open world · Free roam</span></button>
+          <button class="track-ticket" data-map="sunset"><strong>Sunset oval</strong><span>Classic · 3 laps</span></button>
           <button class="track-ticket" data-map="desert"><strong>Desert giant</strong><span>Long · 3 laps</span></button>
           <button class="track-ticket" data-map="coast"><strong>Coast sprint</strong><span>Fast · 3 laps</span></button>
         </div>
-        <button id="start-button" class="primary">Start race</button>
+        <button id="start-button" class="primary">Enter open world</button>
         <button id="garage-button" class="secondary garage-button">Open garage</button>
         <div class="controls-help">
           <span><kbd>W</kbd><kbd>↑</kbd> Accelerate</span>
@@ -65,8 +66,8 @@
 
       <section id="hud" aria-live="polite">
         <div class="race-data">
-          <div class="position"><strong id="position">1</strong><span>/ 4</span></div>
-          <div class="lap"><span>Lap</span><strong id="lap">1 / 3</strong></div>
+          <div class="position"><strong id="position">N</strong><span id="position-total">Heading</span></div>
+          <div class="lap"><span id="lap-label">Mode</span><strong id="lap">Free roam</strong></div>
         </div>
         <div class="time-data">
           <span id="race-time">00:00.000</span>
