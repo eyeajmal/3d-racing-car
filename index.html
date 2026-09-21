@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#ee5b2b" />
+    <title>Apex Sunset</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main id="game" aria-label="Apex Sunset 3D racing game">
+      <canvas id="scene"></canvas>
+
+      <section id="start-screen" class="panel screen visible">
+        <div class="wallet" aria-label="Credits"><span>CR</span><strong id="wallet-balance">2,000</strong></div>
+        <div class="logo" aria-label="Apex Sunset">
+          <span>APEX</span>
+          <span>SUNSET</span>
+        </div>
+        <p class="tagline">Three laps. Four cars. Build your garage.</p>
+        <div class="track-picker" aria-label="Choose circuit">
+          <button class="track-ticket selected" data-map="sunset"><strong>Sunset oval</strong><span>Classic · 3 laps</span></button>
+          <button class="track-ticket" data-map="desert"><strong>Desert giant</strong><span>Long · 3 laps</span></button>
+          <button class="track-ticket" data-map="coast"><strong>Coast sprint</strong><span>Fast · 3 laps</span></button>
+        </div>
+        <button id="start-button" class="primary">Start race</button>
+        <button id="garage-button" class="secondary garage-button">Open garage</button>
+        <div class="controls-help">
+          <span><kbd>W</kbd><kbd>↑</kbd> Accelerate</span>
+          <span><kbd>A</kbd><kbd>D</kbd> Steer</span>
+          <span><kbd>S</kbd><kbd>↓</kbd> Brake</span>
+          <span><kbd>Space</kbd> Drift</span>
+          <span><kbd>R</kbd> Reset</span>
+        </div>
+      </section>
+
+      <section id="garage-screen" class="panel screen garage-screen">
+        <header class="garage-header">
+          <div><p>Your collection</p><h1>Garage</h1></div>
+          <div class="wallet"><span>CR</span><strong id="garage-balance">2,000</strong></div>
+        </header>
+        <div id="car-shop" class="car-shop" aria-label="Cars available to buy"></div>
+        <button id="garage-back" class="primary">Back to race</button>
+      </section>
+
+      <section id="hud" aria-live="polite">
+        <div class="race-data">
+          <div class="position"><strong id="position">1</strong><span>/ 4</span></div>
+          <div class="lap"><span>Lap</span><strong id="lap">1 / 3</strong></div>
+        </div>
+        <div class="time-data">
+          <span id="race-time">00:00.000</span>
+          <small id="best-time">Best —</small>
+        </div>
+        <div class="speedo">
+          <div class="speed-ring"><strong id="speed">0</strong><span>KM/H</span></div>
+          <div class="boost"><i id="boost-bar"></i></div>
+        </div>
+        <canvas id="minimap" width="190" height="128" aria-label="Track map"></canvas>
+      </section>
+
+      <div id="countdown" aria-live="assertive"></div>
+      <div id="message" aria-live="polite"></div>
+
+      <section id="finish-screen" class="panel screen">
+        <p class="finish-label">Race complete</p>
+        <h1 id="finish-place">1st place</h1>
+        <div class="result-time"><span>Total time</span><strong id="final-time">00:00.000</strong></div>
+        <div class="result-time"><span>Best lap</span><strong id="final-best">00:00.000</strong></div>
+        <div class="result-time reward"><span>Prize money</span><strong id="final-reward">+ CR 0</strong></div>
+        <button id="restart-button" class="primary">Race again</button>
+        <button id="finish-menu-button" class="secondary">Race menu</button>
+      </section>
+
+      <button id="pause-button" aria-label="Pause race">Ⅱ</button>
+      <section id="pause-screen" class="panel screen">
+        <h1>Paused</h1>
+        <p>The sunset can wait.</p>
+        <button id="resume-button" class="primary">Resume</button>
+        <button id="quit-button" class="secondary">Restart race</button>
+      </section>
+
+      <div id="mobile-controls" aria-label="Touch controls">
+        <div class="steer-controls">
+          <button data-control="left" aria-label="Steer left">‹</button>
+          <button data-control="right" aria-label="Steer right">›</button>
+        </div>
+        <div class="pedal-controls">
+          <button data-control="brake" aria-label="Brake">BRAKE</button>
+          <button data-control="gas" class="gas" aria-label="Accelerate">GAS</button>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="game.js"></script>
+  </body>
+</html>
